@@ -6,8 +6,10 @@ import datetime
 import urllib.parse
 import click
 import requests
+import re
 import json
 import toml
+import webbrowser
 
 class Config():
     CONFIG_DIR = "%s/.conoha" % os.environ['HOME']
@@ -328,6 +330,65 @@ def create(imageid, flavorid, password, name, key, groupNames):
 
     click.echo(r.text)
 
+@vm.command()
+@click.argument("vm_id")
+@click.option('--text', is_flag=True)
+@click.option('--open', is_flag=True)
+@click.option('-t', '--type', 'type', type=str, help='Console type(serial|vnc)')
+def console(vm_id, text, open, type):
+    headers = { "X-Auth-Token": config.access_token }
+
+    url = "https://compute.%s.conoha.io/v2/%s/servers/detail" % (config.region, config.tenant_id)
+    r = requests.get(url, headers=headers)
+
+    # check vm_id
+    if re.fullmatch(r'[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}', vm_id):
+        servers = filter(lambda x: x['id'] == vm_id, json.loads(r.text)['servers'])
+    else:
+        servers = filter(lambda x: x['metadata']['instance_name_tag'] == vm_id, json.loads(r.text)['servers'])
+
+    server = next(servers, None)
+
+    if server == None:
+        click.echo("Not found instance.")
+        exit();
+
+    vm_id = server['id'];
+
+    url = "https://compute.%s.conoha.io/v2/%s/servers/%s/action" % (config.region, config.tenant_id, vm_id)
+
+    payload = {
+        "os-getWebConsole": {
+            "type": "serial"
+        }
+    }
+
+    if type == 'vnc':
+        payload = {
+            "os-getVNCConsole": {
+                "type": "novnc"
+            }
+        }
+
+    r = requests.post(url, headers=headers, data=json.dumps(payload))
+
+    # open webbrowser
+    if open:
+        console = json.loads(r.text)['console']
+
+        webbrowser.open(console["url"])
+        exit()
+
+    # echo text style
+    if text:
+        console = json.loads(r.text)['console']
+
+        click.echo("CONSOLE_TYPE\tCONSOLE_URL")
+        click.echo("-------------------------------------------------------------------------------")
+        click.echo("%s\t\t%s" % (console["type"], console["url"]))
+    else:
+        click.echo(r.text)
+
 @compute.group()
 def flavor():
     pass
@@ -472,6 +533,33 @@ def remove(keypair_name):
         click.echo("[StatusCode: %s] Failed." % r.status_code)
 
     click.echo(r.text)
+
+#########################################
+# NETWORK API
+#########################################
+@cmd.group()
+def security_group():
+    pass
+
+@security_group.command()
+@click.option('--text', is_flag=True)
+def list(text):
+    headers = { "X-Auth-Token": config.access_token }
+
+    url = "https://networking.%s.conoha.io/v2.0/security-groups" % (config.region)
+
+    r = requests.get(url, headers=headers)
+
+    if text:
+        security_groups = json.loads(r.text)['security_groups']
+
+        click.echo("GROUP_NAME")
+        click.echo("-------------------------")
+        security_groups = sorted(security_groups, key=lambda security_group: security_group["description"])
+        for security_group in security_groups:
+            click.echo("%s" % (security_group['description']))
+    else:
+        click.echo(r.text)
 
 def main():
     global config
