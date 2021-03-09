@@ -538,6 +538,76 @@ def remove(keypair_name):
 # NETWORK API
 #########################################
 @cmd.group()
+def network():
+    pass
+
+@network.command()
+@click.option('--text', is_flag=True)
+def list(text):
+    headers = { "X-Auth-Token": config.access_token }
+
+    url = "https://networking.%s.conoha.io/v2.0/networks" % (config.region)
+
+    r = requests.get(url, headers=headers)
+
+    if text:
+        networks = json.loads(r.text)['networks']
+
+        click.echo("STATUS\tNETWORK_ID\t\t\t\tNETWORK_NAME")
+        click.echo("-------------------------------------------------------------------------------")
+        networks = sorted(networks, key=lambda network: network["name"])
+        for network in networks:
+            click.echo("%s\t%s\t%s" % (network['status'], network['id'], network['name']))
+    else:
+        click.echo(r.text)
+
+@network.group()
+def port():
+    pass
+
+@port.command()
+@click.option('--text', is_flag=True)
+def list(text):
+    headers = { "X-Auth-Token": config.access_token }
+
+    url = "https://networking.%s.conoha.io/v2.0/ports" % (config.region)
+
+    r = requests.get(url, headers=headers)
+
+    if text:
+        ports = json.loads(r.text)['ports']
+        click.echo("STATUS\tPORT_ID\t\t\t\t\tPORT_NAME\t\t\tMAC_ADDRESS")
+        click.echo("-------------------------------------------------------------------------------------------------")
+        ports = sorted(ports, key=lambda port: port["name"])
+        for port in ports:
+            click.echo("%s\t%s\t%s\t%s" % (port['status'], port['id'], port['name'], port['mac_address']))
+    else:
+        click.echo(r.text)
+
+@network.group()
+def subnet():
+    pass
+
+@subnet.command()
+@click.option('--text', is_flag=True)
+def list(text):
+    headers = { "X-Auth-Token": config.access_token }
+
+    url = "https://networking.%s.conoha.io/v2.0/subnets" % (config.region)
+
+    r = requests.get(url, headers=headers)
+
+    if text:
+        subnets = json.loads(r.text)['subnets']
+        click.echo("SUBNET_ID\t\t\t\tSUBNET_NAME\t\t\tCIDR")
+        click.echo("-------------------------------------------------------------------------------------------------")
+        subnets = sorted(subnets, key=lambda subnet: subnet["name"])
+        for subnet in subnets:
+            click.echo("%s\t%s\t%s" % (subnet['id'], subnet['name'], subnet['cidr']))
+    else:
+        click.echo(r.text)
+
+@network.group()
 def security_group():
     pass
 
